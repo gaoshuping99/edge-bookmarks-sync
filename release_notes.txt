@@ -1,0 +1,37 @@
+## v1.0.0 Release Notes
+
+### English
+
+**Edge Sync Helper v1.0.0**  
+The first public release of Edge Sync Helper, a Manifest V3 browser extension for synchronizing Microsoft Edge bookmarks (multi-profile), accounts, and passwords to Chrome/Edge, preserving folder structure and order.
+
+#### Features
+- Multi-profile selection and synchronization
+- Full folder structure and order preservation for bookmarks
+- Visual sync progress, error handling, and retry mechanism
+- Cross-device and cross-browser migration support
+- Local Node.js backend for secure data export
+
+#### How to Use
+1. Start the local Node.js service
+2. Load the extension in your browser
+3. Select the desired Edge profile and start synchronization
+
+---
+
+### 中文
+
+**Edge同步助手 v1.0.0**  
+首个公开版本，基于Manifest V3的浏览器扩展，可将Microsoft Edge浏览器的收藏夹（多Profile）、账号、密码等数据一键同步到当前浏览器（Chrome/Edge），并保留原有目录结构和顺序。
+
+#### 主要特性
+- 支持多Profile选择与同步
+- 保留Edge原有收藏夹目录结构与顺序
+- 同步进度可视化、错误处理与重试机制
+- 跨设备、跨浏览器迁移收藏夹与账号
+- 本地Node.js服务端安全导出数据
+
+#### 使用方法
+1. 启动本地Node.js服务
+2. 在浏览器中加载扩展
+3. 选择Edge个人资料并开始同步
