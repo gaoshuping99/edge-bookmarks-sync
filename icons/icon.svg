@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="64" cy="64" r="60" fill="#0078d4"/>
+  
+  <!-- 同步箭头 -->
+  <g transform="translate(64, 64)">
+    <!-- 左侧箭头 -->
+    <path d="M-20,-20 L-40,0 L-20,20" 
+          stroke="white" 
+          stroke-width="8" 
+          fill="none" 
+          stroke-linecap="round"/>
+    
+    <!-- 右侧箭头 -->
+    <path d="M20,20 L40,0 L20,-20" 
+          stroke="white" 
+          stroke-width="8" 
+          fill="none" 
+          stroke-linecap="round"/>
+    
+    <!-- 连接线 -->
+    <path d="M-20,0 L20,0" 
+          stroke="white" 
+          stroke-width="8" 
+          fill="none" 
+          stroke-linecap="round"/>
+  </g>
+  
+  <!-- 装饰圆点 -->
+  <circle cx="64" cy="64" r="8" fill="white"/>
+</svg> 

@@ -1,0 +1,111 @@
+# 豆包浏览器插件开发规范（Edge同步版）
+
+## 一、项目概述
+### 1.1 目标
+开发一个基于Chromium内核（兼容Edge）的浏览器扩展，实现以下核心功能：
+- 豆包账号体系与Edge浏览器账号深度绑定
+- 收藏夹数据（网页标题/URL/标签）双向实时同步
+- 账号密码（支持主流表单）的加密同步（需符合Edge密码管理器规范）
+- 跨设备（PC/平板/手机）同步状态可视化反馈
+
+### 1.2 技术范围
+- 兼容Edge 120+及Chrome 120+（基于Manifest V3标准）
+- 支持Windows/macOS/Linux桌面端及Edge移动端（Android/iOS）
+- 数据同步延迟≤1s（网络正常时）
+
+---
+
+## 二、技术选型规范
+### 2.1 核心技术栈
+| 领域         | 技术选型                  | 版本要求       | 说明                                                                 |
+|--------------|---------------------------|----------------|----------------------------------------------------------------------|
+| 扩展标准     | Manifest V3               | 最新稳定版     | 替代V2的安全沙盒与Service Worker机制                                |
+| 前端框架     | React 18+                 | ^18.2.0        | 配合Vite 4+构建，支持HMR开发                                         |
+| 状态管理     | Redux Toolkit + RTK Query | ^2.0.0         | 集中管理同步状态与API调用                                            |
+| 数据加密     | Web Crypto API            | 全浏览器支持   | 替代传统CryptoJS，使用AES-GCM（256位）加密存储                       |
+| 同步协议     | WebSockets + Server-Sent Events | -              | 实时同步优先WS，长连接保活使用SSE                                   |
+| 存储方案     | IndexedDB + chrome.storage | -              | 敏感数据（密码）存IndexedDB（加密），元数据存chrome.storage.sync     |
+| 后端交互     | OpenAPI 3.0               | 兼容v3.1.0     | 豆包服务端需提供符合OpenAPI规范的同步接口（/sync/favorites, /sync/credentials） |
+
+### 2.2 禁用技术
+- 禁止使用`eval()`及Function构造函数（安全审计要求）
+- 不允许直接操作`localStorage`（使用chrome.storage替代）
+- 避免使用JQuery（优先原生DOM API或React Hooks）
+- 禁用Manifest V2兼容模式（2024年底前完成V3迁移）
+
+---
+
+## 三、代码规范
+### 3.1 基础规范
+- 文件命名：目录/组件名用`PascalCase`（如`FavoriteSync`），工具类文件用`kebab-case`（如`crypto-utils.ts`）
+- 代码风格：ESLint采用`airbnb-base` + TypeScript扩展，Prettier强制单引号+尾逗号
+- 类型检查：所有函数/组件参数必须标注类型（`strict: true`）
+- 注释规范：
+  - 公共方法/组件：JSDoc格式（包含`@param`/`@returns`/`@example`）
+  - 复杂逻辑：单行注释前空2格（`// 同步策略：先本地暂存再请求`）
+  - 敏感操作：标注安全等级（`// SECURITY: 密码需经PBKDF2二次哈希`）
+
+### 3.2 安全规范// 错误示例：明文存储token
+const userToken = "abc123"; 
+
+// 正确示例：使用加密存储
+async function saveToken(token: string) {
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: new Uint8Array(12) },
+    encryptionKey,
+    new TextEncoder().encode(token)
+  );
+  await chrome.storage.local.set({ secureToken: encrypted });
+}- 密码处理：禁止内存中明文留存，使用`Uint8Array`替代string类型
+- 网络请求：强制HTTPS（`fetch`需校验证书），API路径需配置CSP（`content_security_policy`字段）
+- 权限管理：仅申请`["storage", "favorites", "identity", "scripting"]`必要权限
+
+---
+
+## 四、协作流程
+### 4.1 分支策略
+- `main`：生产环境分支（仅允许发布版本合并）
+- `dev`：集成测试分支（每日CI构建）
+- `feature/{name}`：功能开发分支（需关联Jira任务）
+- `hotfix/{id}`：紧急修复分支（需附带回归测试用例）
+
+### 4.2 PR规范
+- 必须关联Jira任务（如`DBC-123`）
+- 描述需包含：改动点、测试方案、影响范围
+- 强制2人Code Review（至少1名安全/前端专家）
+- 需通过：ESLint检查、TypeScript编译、单元测试（覆盖率≥85%）
+
+### 4.3 同步开发约定
+- 每日站会同步：Edge同步API进度、加密方案测试结果
+- 每周四17:00：全量集成测试（覆盖Win11/Chrome 120、macOS/Edge 121、Ubuntu/Edge Canary）
+- 发布前72小时：启动安全审计（使用OWASP ZAP扫描，漏洞等级≤Medium）
+
+---
+
+## 五、测试与部署
+### 5.1 测试矩阵
+| 测试类型       | 工具/框架          | 覆盖场景                                                                 |
+|----------------|--------------------|--------------------------------------------------------------------------|
+| 单元测试       | Jest + Testing Library | 同步逻辑（90%）、加密函数（100%）、UI组件交互（80%）                    |
+| 集成测试       | Cypress            | 收藏夹增删改→本地存储→服务端→Edge同步全流程                              |
+| 兼容性测试     | BrowserStack       | Edge（稳定版/测试版）、Chrome（稳定版/金丝雀版）、Brave（最新3个大版本） |
+| 压力测试       | k6                 | 1000用户同时同步（延迟≤2s，错误率<0.5%）                                |
+
+### 5.2 部署流程
+1. 开发环境：`npm run dev` → 加载未打包扩展（Edge开发者模式）
+2. 测试环境：`npm run build:staging` → 上传到Edge扩展测试商店（仅限内部账号）
+3. 生产环境：
+   - 代码冻结（分支打tag：`v1.2.3-prod`）
+   - 安全扫描（Snyk + Trivy）
+   - 提交Edge扩展商店审核（需提供：隐私政策、权限说明、崩溃日志收集声明）
+   - 灰度发布（前3天覆盖5%用户，监控错误率<0.1%后全量）
+
+---
+
+## 六、附录：关键API映射表
+| 功能场景         | Edge扩展API                | 豆包服务端API               | 数据格式               |
+|------------------|---------------------------|----------------------------|------------------------|
+| 收藏夹同步       | `chrome.bookmarks`        | `/sync/favorites/v1`       | JSON（含创建时间戳）   |
+| 密码同步         | `chrome.credentials`      | `/sync/credentials/v2`     | Encrypted JSON（AES）  |
+| 账号绑定         | `chrome.identity`         | `/auth/oauth2/token`       | JWT（RS256签名）       |
+| 同步状态反馈     | `chrome.notifications`    | `/sync/status/v1`          | Protobuf（二进制）     |
