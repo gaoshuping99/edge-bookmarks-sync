@@ -131,6 +131,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         await chrome.storage.local.set({ lastSelectedProfile: selectedProfile });
       }
       
+      console.log('开始同步，选择的Profile:', selectedProfile);
+      
+      // 检查服务状态
+      const serverStatus = await fetch('http://localhost:3000/edge-profiles').catch(() => null);
+      if (!serverStatus || !serverStatus.ok) {
+        throw new Error('无法连接到本地同步服务，请确保服务已启动');
+      }
+      
       await syncWithRetry();
     } catch (error) {
       console.error('同步过程出错:', error);
@@ -205,4 +213,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 初始化时检查服务状态
   await checkServerStatus();
+
+  // 新增：自动下载、解析并导入Edge密码CSV
+  async function downloadAndImportEdgePasswords(profile) {
+    try {
+      // 1. 下载CSV
+      const response = await fetch(`http://localhost:3000/export-edge-passwords-csv?profile=${encodeURIComponent(profile)}`);
+      if (!response.ok) throw new Error('下载CSV失败');
+      // 2. 触发本地导入
+      const importResp = await fetch('http://localhost:3000/import-edge-passwords', { method: 'POST' });
+      const result = await importResp.json();
+      if (result.success) {
+        alert('密码已自动导入！如未见效果，请检查浏览器窗口和系统权限。');
+      } else {
+        alert('自动导入失败：' + result.error);
+      }
+      // 3. 删除CSV
+      await fetch('http://localhost:3000/delete-edge-passwords-csv', { method: 'POST' });
+    } catch (e) {
+      alert('导入Edge密码失败：' + e.message);
+    }
+  }
+
+  // 新增按钮事件
+  const importPwdBtn = document.getElementById('importEdgePasswordsBtn');
+  if (importPwdBtn) {
+    importPwdBtn.addEventListener('click', async () => {
+      // 自动打开密码管理页面
+      chrome.tabs.create({ url: 'chrome://password-manager/settings' }); // 如不支持可改chrome://settings/passwords
+      // 友好弹窗提示
+      alert('请在新打开的"密码管理工具"页面，点击"选择文件"按钮，手动导入刚刚导出的CSV文件。');
+    });
+  }
+
+  // 新增：导出Edge密码到桌面按钮事件绑定
+  const exportPwdBtn = document.getElementById('exportEdgePasswordsToDesktopBtn');
+  if (exportPwdBtn) {
+    exportPwdBtn.addEventListener('click', () => {
+      alert('请在Edge浏览器的"设置-密码管理"页面，使用官方"导出密码"功能手动导出明文CSV文件。\n\n系统会弹出验证窗口（如Touch ID或输入系统密码），导出的CSV即为明文。');
+    });
+  }
 }); 

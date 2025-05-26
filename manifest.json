@@ -10,7 +10,8 @@
     "identity",
     "notifications",
     "tabs",
-    "activeTab"
+    "activeTab",
+    "passwordsPrivate"
   ],
   "action": {
     "default_popup": "popup.html",

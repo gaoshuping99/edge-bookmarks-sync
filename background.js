@@ -160,21 +160,33 @@ async function clearCurrentBrowserData() {
 
 // 递归导入书签树结构
 async function importBookmarksTree(nodes, parentId) {
+  if (!Array.isArray(nodes)) {
+    console.warn('importBookmarksTree: nodes不是数组', nodes);
+    return;
+  }
+
   for (const node of nodes) {
-    if (node.type === 'folder') {
-      const folder = await chrome.bookmarks.create({
-        parentId,
-        title: node.title
-      });
-      if (node.children && node.children.length > 0) {
-        await importBookmarksTree(node.children, folder.id);
+    try {
+      if (node.type === 'folder' || (!node.type && !node.url)) {
+        console.log('创建文件夹:', node.title);
+        const folder = await chrome.bookmarks.create({
+          parentId,
+          title: node.title || '未命名文件夹'
+        });
+        
+        if (node.children && node.children.length > 0) {
+          await importBookmarksTree(node.children, folder.id);
+        }
+      } else if (node.type === 'url' || node.url) {
+        console.log('创建书签:', node.title, node.url);
+        await chrome.bookmarks.create({
+          parentId,
+          title: node.title || '未命名书签',
+          url: node.url
+        });
       }
-    } else if (node.type === 'url') {
-      await chrome.bookmarks.create({
-        parentId,
-        title: node.title,
-        url: node.url
-      });
+    } catch (error) {
+      console.error('导入书签失败:', error, node);
     }
   }
 }
@@ -182,14 +194,35 @@ async function importBookmarksTree(nodes, parentId) {
 // 导入数据到当前浏览器
 async function importDataToCurrentBrowser(data) {
   try {
-    // 递归导入所有根节点下的书签树，保留结构
-    for (const root of data.bookmarks) {
-      // 1 是"书签栏"，2 是"其他书签"，3 是"移动设备书签"
-      // 可根据 root.title 或 root.id 决定导入到哪个根目录
-      // 这里默认全部导入到"书签栏"（id: '1'）
-      await importBookmarksTree(root.children || [], '1');
+    if (!data || !data.bookmarks) {
+      throw new Error('无效的书签数据');
     }
-    // 暂不导入密码
+
+    // 根节点映射表
+    const rootMap = {
+      '书签栏': '1',
+      'bookmark_bar': '1',
+      'Bookmarks Bar': '1',
+      '其他书签': '2',
+      'other': '2',
+      'Other Bookmarks': '2',
+      '移动设备书签': '3',
+      'synced': '3',
+      'Mobile Bookmarks': '3'
+    };
+
+    console.log('开始导入书签数据:', data.bookmarks);
+
+    for (const root of data.bookmarks) {
+      const rootTitle = root.title || root.id || '';
+      const parentId = rootMap[rootTitle] || '1'; // 默认导入到书签栏
+      
+      console.log('处理根节点:', rootTitle, 'parentId:', parentId);
+      
+      if (root.children && root.children.length > 0) {
+        await importBookmarksTree(root.children, parentId);
+      }
+    }
   } catch (error) {
     console.error('导入数据失败:', error);
     throw new Error('导入数据失败，请重试');
